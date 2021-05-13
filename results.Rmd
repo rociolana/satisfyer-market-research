@@ -1,0 +1,337 @@
+---
+title: "Results"
+author: "Rocío Lana"
+date: "13/5/2021"
+output: html_document
+---
+
+# Análisis de Resultados.  
+
+
+## Investigación Cuantitativa-Mujeres.  
+
+
+En esta primera parte del documento se presentarán los análisis de resultados de las encuestas cuantitaivas realizadas a mujeres.  
+Se desarrollará en forma de embudo de lo más general a lo más particular. 
+
+En primer lugar analizaremos los **porcentajes de compra**
+
+```{r, eval = TRUE, include = FALSE}
+
+#Paquetes y Librerias + Bases de Datos
+
+library(tidyverse)
+library(dplyr)
+library(ggplot2)
+library(ggthemes)
+library(knitr)
+library(vcd)
+
+Contingency <- function(x) {
+  chi <- chisq.test(x)
+  unname(sqrt(chi$statistic / (chi$statistic + sum(x))))
+}
+
+data_mujeres <- read_csv("SCM.csv", col_names = TRUE)
+datos_mujeres <- data_mujeres%>%
+  mutate(Edad = as.factor(Edad),
+         Nvl_Estudios = as.factor(`Nivel de estudios alcanzados si eres estudiante marca los que estés cursando actualmente`),
+         `Nivel socioeconómico` = as.factor(`Nivel socioeconómico`))
+
+datos_mujeres <- datos_mujeres%>%
+  filter(Sexo == "Mujer")
+
+datos_mujeres_si <- datos_mujeres%>%
+  filter(`¿Has comprado alguna vez un succionador de clítoris?` == "Sí")
+
+datos_mujeres_no <- datos_mujeres%>%
+  filter(`¿Has comprado alguna vez un succionador de clítoris?` == "No")
+
+```
+##### Porcentaje de Mujeres según si han comprado alguna vez un succionador de clítoris
+```{r, echo = FALSE, results = 'markup'}
+porcent_comprado <- mean(datos_mujeres$`¿Has comprado alguna vez un succionador de clítoris?`== "Sí")*100
+porcent_no_comprado <- 100- porcent_comprado
+
+tabla_porcentajes <- as_tibble(data.frame("Sí" = porcent_comprado, "No" = porcent_no_comprado))
+
+kable(tabla_porcentajes)
+
+```
+
+Si nos fijamos en el porcentaje de mujeres que había comprado un succionador de clítoris en función de su estado civil podemos encontrar lo siguiente: 
+
+##### Porcentaje según estado civil
+```{r echo=FALSE, results= 'markup'}
+
+porcent_comprado_pareja <- datos_mujeres%>%
+  group_by(`Estado civil`)%>%
+  summarize(Compra = mean(`¿Has comprado alguna vez un succionador de clítoris?`== "Sí")*100)
+kable(porcent_comprado_pareja)
+
+barras_percent_pareja <- porcent_comprado_pareja%>%
+  ggplot(aes(`Estado civil`, Compra))+
+  geom_bar(stat = "identity", fill ="pink")+
+  theme_economist()+
+  scale_fill_economist()+
+  ggtitle("Porcentaje de mujeres que compran según su Estado civil")
+barras_percent_pareja
+
+```
+
+Como podemos ver el grupo que más compró este producto son las mujeres solteras (siendo un 63% aproximadamente de las mujeres de este grupo las que lo compraron).  
+También es importante destacar que los datos correspondientes al grupo de mujeres casadas deben tomarse como resultados cualitativos ya que la muestra era muy pequeña (solo 19 mujeres en total pertenecían al grupo de mujeres casadas).  
+  
+Si miramos el porcentaje de compra según la **Edad** podemos ver lo siguiente: 
+```{r echo = FALSE, results = 'markup'}
+porcent_comprado_edad <- datos_mujeres%>%
+  group_by(Edad)%>%
+  summarize(Compra = mean(`¿Has comprado alguna vez un succionador de clítoris?`== "Sí")*100)
+kable(porcent_comprado_edad)
+barras_percet_edad <- porcent_comprado_edad%>%
+  ggplot(aes(Edad, Compra))+
+  geom_bar(stat = "identity", fill = "pink")+
+  theme_economist()+
+  scale_fill_economist()+
+  ggtitle("Porcentaje de compra según la Edad")
+barras_percet_edad
+
+```
+  
+Aparentemente existen diferencias en el porcentaje de compra según la edad. Para comprobar si realmente existe una relación entre ellos llevaremos a cabo un test Chi cuadrado.
+
+```{r echo = FALSE, results = 'markup'}
+test_compra <- datos_mujeres%>%
+  group_by(Edad)%>%
+  select(`¿Has comprado alguna vez un succionador de clítoris?`)
+tabla_test_compra <- table(test_compra$`¿Has comprado alguna vez un succionador de clítoris?`, test_compra$Edad)
+test_chi_compra <- chisq.test(tabla_test_compra)
+test_chi_compra
+test_chi_compra$residuals
+contingencia_compra <- Contingency(tabla_test_compra)
+contingencia_compra
+```
+Encontramos una cierta asociación entre la Edad y la compra y además gracias a la tabla de residuos vemos como la relación se invierte a medida que aumenta la edad. Es decir, cuanto mayores son menos de lo esperado compran (compran menos).  
+Cabe recalcar que aunque la dependencia existe su fuerza de asociación no es demasiado grande. Mencionar también que los resultados deben tomarse con cautela debido a la gran disparidad de muestra entre los grupos y la baja muesta en los grupos de mayor edad.  
+Queremos reforzar nuestra conclusión de que existe una asociación entre la edad y la compra y para ello compararemos los grupos de edad extremos: 
+```{r echo = FALSE, results = 'markup'}
+compra_grupos <- tabla_test_compra[,c(1,4)]
+test_chi_grupos <- chisq.test(compra_grupos)
+test_chi_grupos
+assocstats(compra_grupos)
+```
+Vemos que nuevamente existe una cierta dependencia aunque esta sigue teniendo una fuerza de asociación baja.  
+
+  
+### **Intención de compra**    
+
+Si nos centramos ahora en el grupo de mujeres que **NO** habían comprado el producto, es interesante comprender en este caso cuál sería la **intención de compra**. De esta forma podemos ver lo siguiente: 
+
+```{r echo = FALSE, results = 'markup'}
+intencion_compra <- mean(datos_mujeres_no$`¿Te has planteado alguna vez comprar un succionador de clítoris? Uso personal, regalo...` == "Sí")*100
+
+round(intencion_compra,2)
+
+```
+
+Este 73,91 representa el porcentaje de mujeres que no han comprado un succionador de clítoris pero tienen una intención de compra favorable. Es decir, el porcentaje de mujeres que *alguna vez se han planteado comprar un succionador*.  
+
+Por otro lado podemos analizar esta intención de compra en función de **distintos grupos de edad**. Esta información se presenta en la siguiente tabla y su consecuente gráfico: 
+
+```{r echo = FALSE, results = 'markup'}
+intencion_compra_edad <- datos_mujeres_no%>%
+  group_by(Edad)%>%
+  summarize(Intencion = mean(`¿Te has planteado alguna vez comprar un succionador de clítoris? Uso personal, regalo...` == "Sí")*100)
+
+kable(intencion_compra_edad)
+
+graf_intencion_edad <- intencion_compra_edad%>%
+  ggplot(aes(Edad, Intencion))+
+  geom_bar(stat = "identity", fill = "pink")+
+  theme_economist()+
+  scale_fill_economist()+
+  ggtitle("Intención de compra según la Edad")
+graf_intencion_edad
+
+```
+
+Vemos que hay una clara diferencia entre los porcentajes de intención de compra en función de la Edad, si miramos en profundidad y vemos la tabla de contingencias encontramos lo siguiente: 
+```{r echo = FALSE, results = 'markup', warning = 'hide'}
+test <- datos_mujeres_no%>%
+  group_by(Edad)%>%
+  select(`¿Te has planteado alguna vez comprar un succionador de clítoris? Uso personal, regalo...`)
+
+tabla_test <- table(test$Edad,test$`¿Te has planteado alguna vez comprar un succionador de clítoris? Uso personal, regalo...`)
+
+kable(tabla_test)
+
+```
+
+Si llevamos a cabo un análisis Chi cuadrado y el correspondiente coeficiente de contingencia podemos observar que hay una cierta dependencia entre la Edad y la intención de compra. Hay que destacar que estos datos deben tomarse con cierta *cautela* ya que como puede verse en la tabla anterior existen grandes diferencias de muestra entre los grupos, siendo aquellos de mayor edad grupos con una muestra realmente baja.  
+
+#### **Dependencia**
+```{r echo = FALSE, results = 'markup'}
+
+tabla_test <- table(test$`¿Te has planteado alguna vez comprar un succionador de clítoris? Uso personal, regalo...`,test$Edad)
+
+test_chi <- chisq.test(tabla_test, simulate.p.value = TRUE)
+
+test_chi
+
+contingencia <- Contingency(tabla_test)
+contingencia
+
+```
+
+Como puede verse existe una **cierta dependencia entre las variables**. Sería recomendable aumentar significativamente la muestra de los grupos de mayor edad para comprobar si esta tendencia se mantiene y aumenta o si por el contrario se atenua. Como esta dependencia sale significativa (p=0.003) es importante comprobar en que elementos el numero de observaciones varía más de lo esperado: 
+```{r echo=FALSE}
+test_chi$residuals
+```
+
+Podemos ver que en el que más varía sería el gupo de los de **"39 o más"**. Y que además nuevamente la dependencia se invierte a medida que aumenta la edad llegando así nuevamente al caso de que cuanto más mayores menor intención de compra. Esto podría deberse en parte a la poca muestra de dicho grupo.  
+Debido a esta baja mauestra en algunas de las celdas de la tabla se lleva a cabo un test de Fisher, recomendado para muestras más pequeñas, en los grupos más *"extremos"* (es decir, de 18-24 y más de 39 ya que además se incluye el elemento que más difería según el resultado anterior). Se obtuvo lo siguiente:
+```{r echo = FALSE, results= 'markup'}
+test_fisher <- datos_mujeres_no%>%
+  select(`¿Te has planteado alguna vez comprar un succionador de clítoris? Uso personal, regalo...`,Edad)
+
+tabla_fisher <- table(test_fisher$`¿Te has planteado alguna vez comprar un succionador de clítoris? Uso personal, regalo...`, test_fisher$Edad)
+tabla_fisher_2 <- tabla_fisher[,c(1,4)]
+
+
+fisher <- fisher.test(tabla_fisher_2)
+fisher
+assocstats(tabla_fisher_2)
+```
+Se observa nuevamente que la dependencia existe y que tiene una fuerza de asociacion media (Phi-Coefficent // Cramer's V = 0.285)  
+
+En relación a esta cierta dependencia, un dato que parece de cierto interés y que sería muy interesante explorar lo encontramos en la tabla de contingencias anterior que volvemos a mostrar a continuación:
+```{r echo = FALSE, results = 'markup'}
+
+kable(tabla_test)
+```
+
+Si nos fijamos en el grupo de edad de **"39 o más""** podemos ver que es el único grupo de edad en el que la intención de compra es negativa, es decir, hay más mujeres que **NO** se han planteado comprarlo que mujeres que sí.
+
+### **Conclusiones Porcentaje e Intención de compra**
+Aunque los resultados deban tomarse con cautela por la gran desiguadad de sujetos en cada grupo, podemos ver una aparente tendencia a una **mejor aceptación por parte de los grupos de edad más jóvenes respecto a este tipo de productos**. Esto podría estar relacionado con el auge del **movimiento feminista** que impulsa el empoderamiento de la mujere y elimina tabús respecto a la sexualidad. Otro factor que puede influir es el **aumento del uso de las redes sociales** las cuales permiten el acceso a opiniones muy dispares y la difusión de ideas, además de que mucha publicidad de las marcas líderes de este sector está centrada en este tipo de plataformas, lo que puede mejorar la accesibilidad y el conocimiento del producto, haciéndolo más presente en la mente de los posibles consumidores. Con estos resultados podemos concluir que efectivamente encontramos diferencias entre grupos de edad en cuanto a predisposicón a la compra.
+
+### **Top of Mind**  
+Preguntamos a las mujeres que marcas conocían y tal u como puede verse en la tabla a continuación se comprobó empíricamente lo que se había visto mediante el *Desk Research*. El líder y *Top of Mind* de la categoría es la marca **Satisfayer**
+```{r echo=FALSE, results='markup'}
+datos_marcas <- datos_mujeres%>%
+  mutate(Marca = `¿Qué marcas de succionadores de clítoris conoces?`)%>%
+  select(Marca)
+Satisfyer <- sum(str_count(datos_marcas$Marca,"Satis"))/nrow(datos_marcas)*100
+Womanizer <- sum(str_count(datos_marcas$Marca,"Wom"))/nrow(datos_marcas)*100
+Lover_Yoyo <- sum(str_count(datos_marcas$Marca,"Lover"))/nrow(datos_marcas)*100
+Lelo <- sum(str_count(datos_marcas$Marca,"Lelo"))/nrow(datos_marcas)*100
+We_Vibe <- sum(str_count(datos_marcas$Marca,"We"))/nrow(datos_marcas)*100
+Platanomelon <- (sum(str_count(datos_marcas$Marca,"tano|ambo"))-6)/nrow(datos_marcas)*100
+Ninguna <- sum(str_count(datos_marcas$Marca,"No|Nin"))/nrow(datos_marcas)*100
+Amantis <- sum(str_count(datos_marcas$Marca,"Amantis"))/nrow(datos_marcas)*100
+Otras <- sum(str_count(datos_marcas$Marca,"Tra|fid|Ku|Rit"))/nrow(datos_marcas)*100
+
+Marcas <- tibble(Satisfyer,Womanizer,Lover_Yoyo,Lelo,We_Vibe,Platanomelon,Ninguna,Amantis,Otras)
+kable(Marcas)
+
+```
+
+### **Perfil del consumidor**
+```{r echo=F,include=F}
+personalidad_c <- datos_mujeres_si%>%
+  filter(`En el caso de SÍ haberlo comprado, ¿con qué fin?` %in% c("Uso personal", "Ambas opciones"))%>%
+  select(`Siempre estoy dispuesta a escuchar opiniones aunque sean contrarias a las mías`,
+         `Entiendo y respeto puntos de vista que no son iguales que los míos.`, Edad)%>%
+  na.omit()
+personalidad_c$Media_per <- apply(personalidad_c[,c(1,2)],1,mean) #para sumar por filas
+#se puede hacer tambien: personalidad_c$Media_per <- rowSums(personalidad_c[,c(1,2)])
+perss <- round(mean(personalidad_c$Media_per),2)
+
+
+personalidad_ <- datos_mujeres_no%>%
+  select(`Siempre estoy dispuesta a escuchar opiniones aunque sean contrarias a las mías_1`,
+         `Entiendo y respeto puntos de vista que no son iguales que los míos._1`,
+         `¿Te has planteado alguna vez comprar un succionador de clítoris? Uso personal, regalo...`)%>%
+  mutate(intencion = `¿Te has planteado alguna vez comprar un succionador de clítoris? Uso personal, regalo...`)
+personalidad_$media_per <- apply(personalidad_[,c(1,2)],1,mean)
+personalidad_n <- personalidad_%>%
+  group_by(intencion)
+personalidad_nc <- personalidad_n%>%
+  summarize(Media_Personalidad = mean(media_per))
+perso_s <- personalidad_n%>%
+  filter(intencion == "Sí")
+perso_n<-personalidad_n%>%
+  filter(intencion=="No")
+
+Tabla_Personalidad <- tibble(Grupo= c("Comprado","Int.No","Int.Fav") ,Personalidad = c(perss,personalidad_nc$Media_Personalidad))
+
+test_no <- t.test(perso_n$media_per,perso_s$media_per)
+
+test_dif <- t.test(personalidad_c$Media_per,perso_n$media_per)
+
+
+tabu_s <- datos_mujeres_si$`Creo que este tipo de productos debería estar más presente en los medios de comunicación eliminando así los tabús.`%>%na.omit
+
+tabu_n <- datos_mujeres_no$`Creo que este tipo de productos debería estar más presente en los medios de comunicación eliminando así los tabús._1`
+tabu_n_n <- datos_mujeres_no%>%
+  filter(`¿Te has planteado alguna vez comprar un succionador de clítoris? Uso personal, regalo...`=="No")%>%
+  select(`Creo que este tipo de productos debería estar más presente en los medios de comunicación eliminando así los tabús._1`)
+tabu_n_n<-tabu_n_n$`Creo que este tipo de productos debería estar más presente en los medios de comunicación eliminando así los tabús._1`
+mean(tabu_s)
+mean(tabu_n)
+test_tabu <- t.test(tabu_s,tabu_n,mu=0)
+test_tabu2 <- t.test(tabu_s,tabu_n_n)
+
+```
+
+
+Para anlizar el perfil de las consumidoras se incluyeron las siguientes dos preguntas en las encuestas: 
+
+1. Siempre estoy dispuesta a escuchar opiniones aunque sean contrarias a las mías.    
+2. Entiendo y respeto puntos de vista que no son iguales que los míos.
+
+Con estas dos preguntas se quería comprobar si efectivamente las consumidoras tenían una mentalidad abierta y tolerante.  
+Los resultados fueron los siguientes. 
+
+*Media ambas preguntas Mujeres que tenían el producto:*
+
+```{r echo=F,results='markup'}
+personalidad_c <- datos_mujeres_si%>%
+  filter(`En el caso de SÍ haberlo comprado, ¿con qué fin?` %in% c("Uso personal", "Ambas opciones"))%>%
+  select(`Siempre estoy dispuesta a escuchar opiniones aunque sean contrarias a las mías`,
+         `Entiendo y respeto puntos de vista que no son iguales que los míos.`, Edad)%>%
+  na.omit()
+personalidad_c$Media_per <- apply(personalidad_c[,c(1,2)],1,mean)
+round(mean(personalidad_c$Media_per),2)
+
+```
+Como se puede ver la media es de **3.61**, teniendo en cuenta que la nota máxima es de 4 es una media considerablemente alta y apunta a que son personas con esta metalidad de tolerancia y apertura.  
+Si nos fijamos ahora en el grupo de mujeres que NO tiene el producto podemos ver lo siguiente:
+```{r echo=F,results='markup'}
+personalidad_ <- datos_mujeres_no%>%
+  select(`Siempre estoy dispuesta a escuchar opiniones aunque sean contrarias a las mías_1`,
+         `Entiendo y respeto puntos de vista que no son iguales que los míos._1`,
+         `¿Te has planteado alguna vez comprar un succionador de clítoris? Uso personal, regalo...`)%>%
+  mutate(intencion = `¿Te has planteado alguna vez comprar un succionador de clítoris? Uso personal, regalo...`)
+personalidad_$media_per <- apply(personalidad_[,c(1,2)],1,mean)
+personalidad_n <- personalidad_%>%
+  group_by(intencion)
+personalidad_nc <- personalidad_n%>%
+  summarize(Media_Personalidad = mean(media_per))
+kable(personalidad_nc)
+
+```
+
+Como podemos observar en la tabla en este caso la media tambien es muy alta en ambos grupos (Intención de compra positiva vs. intención de compra negativa), siendo la media de todos los grupos muy similar: 
+```{r echo=F,results='markup'}
+perss <- round(mean(personalidad_c$Media_per),2)
+Tabla_Personalidad <- tibble(Grupo= c("Comprado","Int.No","Int.Fav") ,Personalidad = c(perss,personalidad_nc$Media_Personalidad))
+kable(Tabla_Personalidad)
+grafico_tabla <- Tabla_Personalidad%>%
+  ggplot(aes(Grupo,Personalidad))+
+  geom_bar(stat = "identity", fill ="pink")+
+  theme_economist()+
+  scale_fill_economist()+
+  ggtitle("Media Personalidad según el Grupo")
+grafico_tabla
+```
